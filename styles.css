@@ -38,6 +38,8 @@ body > main {
   --mark: light-dark(#bd502f, #f2a585);
   --ok: light-dark(#e3f1e8, #2d4838);
   --oktxt: light-dark(#25523d, #bedac8);
+  --late: light-dark(#fbe1d8, #4d2a21);
+  --latetxt: light-dark(#8a2c10, #f7c6b4);
   background: var(--paper);
   color: var(--ink);
   font:
@@ -263,6 +265,32 @@ body > main {
   background: var(--ok);
   color: var(--oktxt);
 }
+#campus-stores .late {
+  background: var(--late);
+  color: var(--latetxt);
+  font-weight: 600;
+}
+#campus-stores .soon {
+  background: var(--memo);
+  color: var(--memotxt);
+}
+#campus-stores .warn {
+  background: var(--late);
+  color: var(--latetxt);
+  font-weight: 600;
+  padding: 7px 9px;
+  border-radius: 6px;
+}
+#campus-stores .outstanding {
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--line);
+}
+#campus-stores .outstanding h2 {
+  font-size: 16px;
+}
+#campus-stores .outstanding .sectionhead {
+  margin-bottom: 6px;
+}
 #campus-stores .record {
   margin-top: 14px;
   padding: 12px 13px;
@@ -350,6 +378,9 @@ body > main {
   #campus-stores .examstrip,
   #campus-stores .shift {
     padding: 9px 12px;
+  }
+  #campus-stores .outstanding {
+    padding: 12px;
   }
 }
 @container (max-width:420px) {

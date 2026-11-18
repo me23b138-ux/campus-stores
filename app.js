@@ -67,22 +67,27 @@
   const shifts = [
     {
       time: "Friday · 3:45 pm",
+      at: 15.75,
       title: "Pickup at the counter",
       text: "Kabir is here for the Film Society screening. The film starts at four. Can he leave with everything he needs?",
       next: "Move to return time",
     },
     {
       time: "Friday · 7:30 pm",
+      at: 19.5,
       title: "The kit comes back in pieces",
       text: "Kabir has brought back the projector and speaker. “Leela still has the adapter. She’ll drop it off tomorrow at nine.” Take the return and hand over to the morning shift.",
       next: "Move to next morning",
     },
     {
       time: "Saturday · 9:00 am",
+      at: 33,
       title: "Morning shift",
       text: "You’ve just taken over. Leela walks in with an adapter. Work out what was outstanding from the screening and close the loan for the right item.",
     },
   ];
+  // Due labels as hours since Friday 00:00, so they can be compared with a shift's `at`.
+  const dueAt = { "Fri 8 pm": 20, "Sat 9 am": 33, "Sat 10 am": 34, "Sat noon": 36 };
   const pages = [
     ["Requests", "clipboard-list"],
     ["Inventory", "package"],
@@ -107,6 +112,7 @@
     ],
     notes: [],
     editing: false,
+    returning: 0,
     onlyOpen: true,
     notice: "Sample shift · All records are fictional.",
   });
@@ -156,8 +162,48 @@
     "</small></div><div>" +
     right +
     "</div></div>";
-  const badge = (t, good = false) =>
-    '<span class="tag' + (good ? " good" : "") + '">' + esc(t) + "</span>";
+  const badge = (t, kind = "") =>
+    '<span class="tag' + (kind ? " " + kind : "") + '">' + esc(t) + "</span>";
+  const span = (h) => {
+    const m = Math.round(Math.abs(h) * 60);
+    const hh = Math.floor(m / 60);
+    const mm = m % 60;
+    return hh ? hh + " h" + (mm ? " " + mm + " min" : "") : mm + " min";
+  };
+  // Open loans with their time against the current desk time, most overdue first.
+  function outstandingLoans() {
+    const now = shifts[s.phase].at;
+    return s.loans
+      .filter((l) => !l.back)
+      .map((l) => {
+        const t = dueAt[l.due];
+        const diff = t === undefined ? null : t - now;
+        const state = diff === null ? "ok" : diff < 0 ? "late" : diff <= 1 ? "soon" : "ok";
+        return { l, diff, state, a: getAsset(l.asset), r: getReq(l.req) };
+      })
+      .sort((x, y) => (x.diff ?? Infinity) - (y.diff ?? Infinity));
+  }
+  function outstanding() {
+    const list = outstandingLoans();
+    const late = list.filter((x) => x.state === "late").length;
+    let html = head(
+      "Still out",
+      list.length + " on loan · " + late + " overdue",
+      btn("Open loan register", "tab", "Loan register"),
+    );
+    if (!list.length) return html + "<p>Nothing is out. The desk is clear.</p>";
+    for (const { l, a, r, diff, state } of list)
+      html += row(
+        a.id + " · " + a.type,
+        "L-" + l.num + " · " + r.club + " (" + r.id + ") · " + l.who + " · Due " + l.due,
+        state === "late"
+          ? badge("Overdue " + span(diff), "late")
+          : diff === null
+            ? badge("Due " + l.due)
+            : badge("Due in " + span(diff), state === "soon" ? "soon" : ""),
+      );
+    return html;
+  }
   function requestPage() {
     let html = head(
       "Approved requests",
@@ -215,10 +261,29 @@
       html += row(
         a.id + " · " + a.type,
         a.model + " · " + a.bin,
-        badge(status, status === "On shelf"),
+        badge(status, status === "On shelf" ? "good" : ""),
       );
     }
     return html;
+  }
+  // Asks which physical unit is being handed back before a slip is closed.
+  function returnForm(l) {
+    const a = getAsset(l.asset);
+    const same = assets
+      .filter((x) => x.type === a.type && !x.repair)
+      .map((x) => [x.id, x.id + " · " + x.model + " · " + x.bin]);
+    return (
+      '<form data-return class="record"><h3>Return L-' +
+      l.num +
+      " · " +
+      esc(a.type) +
+      "</h3><small>Check the asset label on the unit being handed back.</small>" +
+      '<div class="form"><label class="full"><span>Unit handed back</span><select name="unit" data-unit required><option value="">Select…</option>' +
+      opts(same) +
+      '</select></label></div><p class="warn" data-warn role="alert" hidden></p><div class="buttons"><button type="submit" class="primary">Confirm return</button>' +
+      btn("Cancel", "unreturn") +
+      "</div></form>"
+    );
   }
   function register() {
     let html = head(
@@ -285,13 +350,16 @@
       .reverse();
     if (!shown.length) html += "<p>No outstanding slips.</p>";
     for (const l of shown)
-      html += row(
-        "L-" + l.num + " · " + l.asset,
-        l.req + " · " + l.who + " · Due " + l.due,
-        l.back
-          ? badge("Returned")
-          : btn("Record return", "return", String(l.num)),
-      );
+      html +=
+        s.returning === l.num && !l.back
+          ? returnForm(l)
+          : row(
+              "L-" + l.num + " · " + l.asset,
+              l.req + " · " + l.who + " · Due " + l.due,
+              l.back
+                ? badge("Returned")
+                : btn("Record return", "return", String(l.num)),
+            );
     return html;
   }
   function deskbook() {
@@ -347,6 +415,7 @@
     const advance = q('[data-action="advance"]');
     advance.hidden = !phase.next;
     advance.textContent = phase.next || "";
+    q("[data-outstanding]").innerHTML = outstanding();
     q("[data-nav]").innerHTML = pages
       .map(
         ([n, icon]) =>
@@ -363,6 +432,7 @@
       .join("");
     q("[data-page]").innerHTML = screens[s.tab]();
     if (q("[data-filter]")) q("[data-filter]").value = s.filter;
+    if (s.returning && q("[data-unit]")) q("[data-unit]").focus();
     q("[data-status]").textContent = s.notice;
   }
   function commit(msg) {
@@ -390,6 +460,7 @@
       case "tab":
         s.tab = v;
         s.editing = false;
+        s.returning = 0;
         break;
       case "close":
         s.selected = "";
@@ -409,10 +480,13 @@
       case "return": {
         const l = s.loans.find((l) => l.num === Number(v));
         if (!l || l.back) return;
-        l.back = true;
-        s.notice = l.asset + " returned to stock. Slip L-" + l.num + " closed.";
+        s.returning = l.num;
+        s.notice = "Choose the unit being handed back to close slip L-" + l.num + ".";
         break;
       }
+      case "unreturn":
+        s.returning = 0;
+        break;
     }
     commit();
   });
@@ -431,6 +505,24 @@
       if (!text) return;
       s.notes.push({ phase: s.phase, text });
       commit("Handover note saved.");
+      return;
+    }
+    if (f.matches("[data-return]")) {
+      const l = s.loans.find((l) => l.num === s.returning);
+      const unit = getAsset(String(form.get("unit")));
+      if (!l || l.back || !unit) return;
+      if (unit.id !== l.asset) {
+        const msg =
+          unit.id + " doesn't match slip L-" + l.num + ", which was issued for " + l.asset +
+          ". Check the label on the unit before closing.";
+        q("[data-warn]").textContent = msg;
+        q("[data-warn]").hidden = false;
+        q("[data-status]").textContent = msg;
+        return;
+      }
+      l.back = true;
+      s.returning = 0;
+      commit(unit.id + " confirmed and returned to stock. Slip L-" + l.num + " closed.");
       return;
     }
     if (!f.matches("[data-issue]")) return;
@@ -482,6 +574,7 @@
     s = {
       ...original(),
       ...d,
+      returning: 0,
       loans: d.loans.map((l) => ({ ...l })),
       notes: d.notes.map((n) => ({ ...n })),
     };

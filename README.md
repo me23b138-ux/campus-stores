@@ -23,6 +23,27 @@ Each browser stores its own sample shift locally when browser storage is availab
 Icon license notices are in [third-party/lucide-LICENSE.txt](third-party/lucide-LICENSE.txt).
 
 
+## My change: a "Still out" panel
+
+**What I changed.** A panel under the shift banner, visible on every tab, listing every loan that is still out. Each row shows the unit, slip number, club and request, holder and due time. It says how far past due or how long until due, and the most overdue loan sorts first. Changes are in `app.js` (`outstandingLoans`, `outstanding`, a per-phase `at` time and a `dueAt` map), `index.html` (one `<section>`) and `styles.css`.
+
+**Why.** On the Saturday 9:00 am handover I had to work out what was still out. That answer was spread across three places: an open slip in the Loan register (in Kabir's name), an "On loan" badge in Inventory, and a free-text Desk book note. Due times were plain strings (`"Fri 8 pm"`), so the app never flagged that the adapter was overdue.
+
+**Same job, with the panel.**
+- 3:45 pm: after issuing the kit, the panel shows everything out and due in 4 h 15 min.
+- 7:30 pm: after returning the projector and speaker, it shows only the adapter, due in 30 min.
+- 9:00 am: it opens with the adapter at the top, *Overdue 13 h*, plus the Debate Union microphone due in 1 h. I know what to look for before Leela speaks.
+
+**What I kept.** One slip per physical unit and the approval checks at issue time. They are what stop the wrong item leaving the desk, so I only added visibility.
+
+**Second small change: confirm the unit on return.** The two adapters (AD-12, AD-15) are identical and share bin C4, but "Record return" used to close a slip with one click and no check. Now it asks "Unit handed back", listing the same-type units with model and bin. If the unit picked doesn't match the slip, the app warns inline and keeps the slip open. The Saturday task is to "close the loan for the right item", and this is the step that checks it. The code is `returnForm()` and the `[data-return]` submit branch in `app.js`.
+
+**What it does not solve.** The slip still names Kabir as holder although Leela has the adapter. Moving custody to her, so the panel shows who holds it now, would be the next change.
+
+**How I would know it helped at a real counter.** Time how long an incoming shift takes to say what is outstanding, with and without the panel, and count how many tabs they open to check. For the unit check, count returns where the slip closed against a different unit than the one handed back, before and after.
+
+**One thing that worked well.** *(Replace with your own evidence from your shift. For example: the issue form refused a unit outside the approved request, which stopped a wrong item leaving the desk.)*
+
 ## Submit your work
 
 1. [Fork Campus Stores](https://github.com/virinchi-healthcare/campus-stores/fork) into your GitHub account. Complete the candidate brief and push your changes to your public fork. In your README, point reviewers to your work and explain the decision you made.
